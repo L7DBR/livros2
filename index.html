@@ -74,6 +74,23 @@
             background-color: #eee;
         }
 
+        /* Wrapper da imagem para permitir legenda sobreposta */
+        .card-img-wrapper { position: relative; width: 100%; height: 200px; overflow: hidden; }
+        .card-img-wrapper img { width: 100%; height: 100%; object-fit: cover; display: block; }
+        .cover-caption {
+            position: absolute;
+            left: 0; right: 0; bottom: 0;
+            background: linear-gradient(180deg, rgba(0,0,0,0) 0%, rgba(0,0,0,0.55) 100%);
+            color: #fff;
+            padding: 10px;
+            font-weight: 600;
+            display: flex;
+            justify-content: space-between;
+            gap: 8px;
+            align-items: center;
+        }
+        .cover-caption .author { font-weight: 400; font-size: 0.9em; opacity: 0.95; }
+        
         .card-body { padding: 15px; flex-grow: 1; display: flex; flex-direction: column; }
         
         .card-title { margin: 0 0 5px; font-size: 1.1em; color: var(--primary); }
@@ -122,6 +139,18 @@
         }
 
         .modal-desc { line-height: 1.6; color: #444; margin: 15px 0; }
+
+        /* Abas e estilos de comentários no modal */
+        .modal-tabs { display:flex; gap:8px; margin-bottom:12px; }
+        .modal-tabs .tab {
+            padding:8px 12px; border-radius:6px; border:1px solid #eee; background:#f8fafc; cursor:pointer; font-weight:600; color:var(--secondary);
+        }
+        .modal-tabs .tab.active { background:var(--primary); color:#fff; border-color:var(--primary); }
+
+        .reviews .review { border:1px solid #eee; padding:10px; border-radius:8px; margin-bottom:8px; background:#fff; }
+        .review-head { display:flex; justify-content:space-between; align-items:center; margin-bottom:6px; }
+        .review-rating { color:#f6b042; font-weight:700; }
+        .review-date { font-size:0.8em; color:#999; margin-top:6px; }
         
         /* Rodapé */
         footer { text-align: center; padding: 20px; color: #999; font-size: 0.8em; }
@@ -143,12 +172,23 @@
     <div id="modal" class="modal-overlay">
         <div class="modal-content">
             <span class="close-modal" onclick="closeModal()">&times;</span>
-            <h2 id="modal-title">Título do Livro</h2>
-            <p id="modal-author">Autor</p>
-            <hr style="border: 0; border-top: 1px solid #eee;">
-            <p id="modal-description" class="modal-desc">Descrição completa aqui...</p>
-            <div id="modal-actions">
+            <div class="modal-tabs">
+                <button class="tab active" id="tab-details" onclick="switchModalTab('details')">Detalhes</button>
+                <button class="tab" id="tab-comments" onclick="switchModalTab('comments')">Comentários</button>
+            </div>
+            <div id="modal-body">
+                <div id="modal-details">
+                    <h2 id="modal-title">Título do Livro</h2>
+                    <p id="modal-author">Autor</p>
+                    <hr style="border: 0; border-top: 1px solid #eee;">
+                    <p id="modal-description" class="modal-desc">Descrição completa aqui...</p>
+                    <div id="modal-actions"></div>
                 </div>
+
+                <div id="modal-comments" style="display:none;">
+                    <div id="modal-reviews"></div>
+                </div>
+            </div>
         </div>
     </div>
 
@@ -168,7 +208,7 @@
                 title: "Lógica de Programação",
                 author: "André Luiz",
                 code: "LOG-001",
-                cover: "https://m.media-amazon.com/images/I/41D5+rN4PCL._SY445_SX342_.jpg", // Link de exemplo
+                cover: "./imagens/logicaprog_vendas.png", // Link de exemplo
                 description: "O passo inicial para quem quer programar. Aborda algoritmos, fluxogramas e pseudocódigo de forma didática."
             },
             {
@@ -176,7 +216,7 @@
                 title: "HTML5 e CSS3",
                 author: "Maurício Samy",
                 code: "WEB-002",
-                cover: "https://m.media-amazon.com/images/I/61h0g+b6XUL._SY425_.jpg",
+                cover: "./imagens/HTML5CSS3.jpg",
                 description: "Guia completo para desenvolvimento front-end moderno. Aprenda a estruturar e estilizar páginas web responsivas."
             },
             {
@@ -184,7 +224,7 @@
                 title: "JavaScript: O Guia Definitivo",
                 author: "David Flanagan",
                 code: "JS-003",
-                cover: "https://m.media-amazon.com/images/I/91z1dYtDk5L._SY425_.jpg",
+                cover: "./imagens/javascript.jpg",
                 description: "Referência completa para programadores, cobrindo desde o básico até as APIs mais complexas da linguagem."
             },
             {
@@ -200,7 +240,7 @@
                 title: "Redes de Computadores",
                 author: "Tanenbaum",
                 code: "RED-005",
-                cover: "https://m.media-amazon.com/images/I/51w7gY1+N5L._SY445_SX342_.jpg",
+                cover: "./imagens/Redesdecomputadores.jpg",
                 description: "A bíblia das redes. Camadas OSI, protocolos TCP/IP e segurança de redes."
             }
         ];
@@ -215,6 +255,117 @@
         function getWhatsappLink(book) {
             const msg = `Olá! Gostaria de saber se o livro *${book.title}* (Cód: ${book.code}) está disponível para retirada?`;
             return `https://wa.me/${WHATSAPP_NUMBER}?text=${encodeURIComponent(msg)}`;
+        }
+
+        // Função para gerar uma capa SVG simples como data URL (garante que sempre haja imagem)
+        function generateCoverDataUrl(book) {
+            const width = 600;
+            const height = 800;
+            const bg = '%2300529b'; // cor de fundo (hex sem # deve ser codificado)
+            const title = encodeURIComponent(book.title);
+            const author = encodeURIComponent(book.author);
+            const svg = `<?xml version="1.0" encoding="UTF-8"?>` +
+                `<svg xmlns='http://www.w3.org/2000/svg' width='${width}' height='${height}' viewBox='0 0 ${width} ${height}'>` +
+                `<rect width='100%' height='100%' fill='${bg}'/>` +
+                `<g fill='#ffffff' font-family='Segoe UI, Tahoma, Geneva, Verdana, sans-serif'>` +
+                `<text x='50%' y='45%' font-size='30' text-anchor='middle' font-weight='700'>${title}</text>` +
+                `<text x='50%' y='55%' font-size='20' text-anchor='middle' font-weight='400'>${author}</text>` +
+                `</g>` +
+                `</svg>`;
+            return `data:image/svg+xml;utf8,${encodeURIComponent(svg)}`;
+        }
+
+        // --- SISTEMA DE COMENTÁRIOS / AVALIAÇÕES ---
+        function getReviews(bookId) {
+            try { return JSON.parse(localStorage.getItem('reviews_' + bookId) || '[]'); } catch (e) { return []; }
+        }
+
+        function saveReviews(bookId, reviews) { localStorage.setItem('reviews_' + bookId, JSON.stringify(reviews)); }
+
+        function addReview(bookId, review) {
+            const list = getReviews(bookId);
+            list.unshift(review);
+            saveReviews(bookId, list);
+        }
+
+        function computeAverage(bookId) {
+            const list = getReviews(bookId);
+            if (!list || list.length === 0) return 0;
+            const sum = list.reduce((s, r) => s + (Number(r.rating) || 0), 0);
+            return sum / list.length;
+        }
+
+        function escapeHtml(str) {
+            return String(str || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
+        }
+
+        function renderReviewsInModal(bookId) {
+            const container = document.getElementById('modal-reviews');
+            if (!container) return;
+            const reviews = getReviews(bookId);
+            const avg = computeAverage(bookId);
+            let html = `<div style="margin-bottom:10px;"><strong>Avaliação média: ${avg ? avg.toFixed(1) : '—'} ★</strong></div>`;
+            if (reviews.length === 0) {
+                html += `<p style="color:#666;">Seja o primeiro a comentar e avaliar este livro.</p>`;
+            } else {
+                html += '<div class="reviews">';
+                reviews.forEach(r => {
+                    const when = new Date(r.date).toLocaleString();
+                    html += `
+                        <div class="review">
+                            <div class="review-head"><strong>${escapeHtml(r.name || 'Anônimo')}</strong> <span class="review-rating">${Number(r.rating)||0} ★</span></div>
+                            <div class="review-body">${escapeHtml(r.comment || '')}</div>
+                            <div class="review-date">${when}</div>
+                        </div>`;
+                });
+                html += '</div>';
+            }
+
+            html += `
+                <hr style="margin:12px 0; border:0; border-top:1px solid #eee;">
+                <form id="modal-review-form" onsubmit="submitReview(event)">
+                    <input type="hidden" id="modal-review-bookid" value="${bookId}">
+                    <input type="text" id="modal-review-name" placeholder="Seu nome (opcional)" style="width:100%; padding:8px; margin-bottom:8px; border:1px solid #ddd; border-radius:6px;">
+                    <select id="modal-review-rating" style="width:100%; padding:8px; margin-bottom:8px; border:1px solid #ddd; border-radius:6px;">
+                        <option value="5">5 - Excelente</option>
+                        <option value="4">4 - Muito bom</option>
+                        <option value="3">3 - Bom</option>
+                        <option value="2">2 - Regular</option>
+                        <option value="1">1 - Ruim</option>
+                    </select>
+                    <textarea id="modal-review-comment" rows="3" placeholder="Seu comentário" style="width:100%; padding:8px; border:1px solid #ddd; border-radius:6px;"></textarea>
+                    <button class="btn btn-info" type="submit" style="margin-top:8px;">Enviar Comentário</button>
+                </form>`;
+
+            container.innerHTML = html;
+        }
+
+        function submitReview(e) {
+            e.preventDefault();
+            const bookId = document.getElementById('modal-review-bookid').value;
+            const name = document.getElementById('modal-review-name').value.trim();
+            const rating = document.getElementById('modal-review-rating').value;
+            const comment = document.getElementById('modal-review-comment').value.trim();
+            if (!rating) return;
+            const review = { name, rating: Number(rating), comment, date: new Date().toISOString() };
+            addReview(bookId, review);
+            renderReviewsInModal(bookId);
+            document.getElementById('modal-review-form').reset();
+            renderBooks(searchInput.value);
+        }
+
+        function switchModalTab(tab) {
+            const details = document.getElementById('modal-details');
+            const comments = document.getElementById('modal-comments');
+            const tabDetails = document.getElementById('tab-details');
+            const tabComments = document.getElementById('tab-comments');
+            if (tab === 'comments') {
+                details.style.display = 'none'; comments.style.display = 'block';
+                tabDetails.classList.remove('active'); tabComments.classList.add('active');
+            } else {
+                details.style.display = 'block'; comments.style.display = 'none';
+                tabDetails.classList.add('active'); tabComments.classList.remove('active');
+            }
         }
 
         // Função principal de renderização
@@ -236,10 +387,16 @@
                 card.className = 'card';
                 
                 // Usamos uma imagem padrão se o link quebrar ou não existir
-                const imageSrc = book.cover || 'https://via.placeholder.com/300x400?text=Sem+Capa';
+                const imageSrc = (book.cover && book.cover.trim() !== '') ? book.cover : generateCoverDataUrl(book);
 
                 card.innerHTML = `
-                    <img src="${imageSrc}" alt="${book.title}" class="card-img">
+                    <div class="card-img-wrapper">
+                        <img src="${imageSrc}" alt="${book.title}" class="card-img" onerror="this.onerror=null;this.src='${generateCoverDataUrl({title: 'Sem Capa', author: ''})}';">
+                        <div class="cover-caption">
+                            <span class="title">${book.title}</span>
+                            <span class="author">${book.author}</span>
+                        </div>
+                    </div>
                     <div class="card-body">
                         <h3 class="card-title">${book.title}</h3>
                         <p class="card-author">${book.author}</p>
@@ -274,6 +431,8 @@
                 </a>
             `;
 
+            renderReviewsInModal(id); // Carrega os comentários ao abrir o modal
+
             modal.style.display = 'flex';
         }
 
@@ -301,3 +460,8 @@
     </script>
 </body>
 </html>
+
+
+
+
+
